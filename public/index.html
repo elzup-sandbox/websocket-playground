@@ -48,12 +48,14 @@
         const ws = new WebSocket(host + "/ws");
 
         const form = document.querySelector(".form");
+        const myId = self.crypto.randomUUID().substr(0, 8);
 
         form.onsubmit = function (e) {
           e.preventDefault();
           const input = document.querySelector(".input");
           const text = input.value;
-          ws.send(text);
+
+          ws.send(myId + ":" + text);
           input.value = "";
           input.focus();
         };
