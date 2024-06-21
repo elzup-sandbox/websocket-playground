@@ -8,7 +8,7 @@
       .chat {
         display: flex;
         flex-direction: column;
-        height: 100vh;
+        height: 80vh;
       }
       .messages {
         flex: 1;
@@ -41,40 +41,94 @@
         <button class="submit">Send</button>
       </form>
     </div>
+    <canvas
+      id="canvas"
+      width="600"
+      height="600"
+      style="border: solid 1px black"
+    ></canvas>
 
     <script>
       function main() {
         const host = location.origin.replace(/^http/, "ws");
         const ws = new WebSocket(host + "/ws");
+        const myId = self.crypto.randomUUID().substr(0, 8);
+
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        let drawing = false;
+
+        canvas.addEventListener("mousedown", (e) => {
+          drawing = true;
+          draw(e.offsetX, e.offsetY, false);
+        });
+
+        canvas.addEventListener("mousemove", (e) => {
+          if (drawing) {
+            draw(e.offsetX, e.offsetY, true);
+          }
+        });
+
+        canvas.addEventListener("mouseup", () => {
+          drawing = false;
+          ctx.beginPath();
+        });
+
+        canvas.addEventListener("mouseout", () => {
+          drawing = false;
+          ctx.beginPath();
+        });
+
+        function draw(x, y, dragging) {
+          if (dragging) {
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            sendDrawingEvent(x, y, dragging);
+          } else {
+            ctx.moveTo(x, y);
+          }
+        }
+
+        function sendDrawingEvent(x, y, dragging) {
+          const message = JSON.stringify({ x, y, dragging, type: "paint" });
+          ws.send(message);
+        }
+
+        ws.onmessage = (event) => {
+          const msg = JSON.parse(event.data);
+          if (msg.type !== "paint") return;
+          const { x, y, dragging } = msg;
+          if (dragging) {
+            ctx.lineTo(x, y);
+            ctx.stroke();
+          } else {
+            ctx.moveTo(x, y);
+          }
+        };
 
         const form = document.querySelector(".form");
-        const myId = self.crypto.randomUUID().substr(0, 8);
 
         form.onsubmit = function (e) {
           e.preventDefault();
           const input = document.querySelector(".input");
           const text = input.value;
-
-          const msg = {
-            id: myId,
-            text: text,
-          };
-
-          ws.send(JSON.stringify(msg));
+          ws.send(JSON.stringify({ id: myId, text }));
           input.value = "";
           input.focus();
         };
 
         ws.onmessage = function (msg) {
-          const response = msg.data;
-          const res = JSON.parse(msg.data);
+          if (msg.type !== "chat") return;
 
+          const response = msg.data;
+          const { id, text } = JSON.parse(msg.data);
           const messageList = document.querySelector(".messages");
           const li = document.createElement("li");
-          if (res.id === myId) {
-            li.textContent = `(${res.id})自分:` + res.text;
+          if (id === myId) {
+            li.textContent = `(${id})自分:` + text;
           } else {
-            li.textContent = res.id + ": " + res.text;
+            li.textContent = id + ": " + text;
           }
           messageList.appendChild(li);
         };
