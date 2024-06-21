@@ -60,50 +60,78 @@
         let drawing = false;
 
         canvas.addEventListener("mousedown", (e) => {
-          drawing = true;
-          draw(e.offsetX, e.offsetY, false);
+          sendDrawingEvent(e.offsetX, e.offsetY, "mousedown");
         });
+        function mousedown() {
+          drawing = true;
+          ctx.beginPath();
+        }
 
         canvas.addEventListener("mousemove", (e) => {
           if (drawing) {
-            draw(e.offsetX, e.offsetY, true);
+            sendDrawingEvent(e.offsetX, e.offsetY, "mousemove");
           }
         });
+        function mousemove(x, y) {
+          if (drawing) {
+            draw(x, y, true);
+          }
+        }
 
-        canvas.addEventListener("mouseup", () => {
+        canvas.addEventListener("mouseup", (e) => {
+          sendDrawingEvent(e.offsetX, e.offsetY, "mouseup");
+        });
+        function mouseup() {
           drawing = false;
           ctx.beginPath();
-        });
+        }
 
-        canvas.addEventListener("mouseout", () => {
-          drawing = false;
-          ctx.beginPath();
+        canvas.addEventListener("mouseout", (e) => {
+          sendDrawingEvent(e.offsetX, e.offsetY, "mouseout");
         });
+        function mouseout() {
+          drawing = false;
+        }
 
         function draw(x, y, dragging) {
           if (dragging) {
             ctx.lineTo(x, y);
             ctx.stroke();
-            sendDrawingEvent(x, y, dragging);
           } else {
             ctx.moveTo(x, y);
           }
         }
 
-        function sendDrawingEvent(x, y, dragging) {
-          const message = JSON.stringify({ x, y, dragging, type: "paint" });
+        function sendDrawingEvent(x, y, control) {
+          const message = JSON.stringify({ x, y, control, type: "paint" });
           ws.send(message);
         }
 
         ws.onmessage = (event) => {
           const msg = JSON.parse(event.data);
-          if (msg.type !== "paint") return;
-          const { x, y, dragging } = msg;
-          if (dragging) {
-            ctx.lineTo(x, y);
-            ctx.stroke();
-          } else {
-            ctx.moveTo(x, y);
+          if (msg.type === "paint") {
+            const { x, y, control } = msg;
+            console.log({ control });
+            if (control === "mousedown") {
+              mousedown();
+            } else if (control === "mouseup") {
+              mouseup();
+            } else if (control === "mousemove") {
+              mousemove(x, y);
+            } else if (control === "mouseout") {
+              mouseout();
+            }
+          }
+          if (msg.type === "chat") {
+            const { id, text } = msg;
+            const messageList = document.querySelector(".messages");
+            const li = document.createElement("li");
+            if (id === myId) {
+              li.textContent = `(${id})自分:` + text;
+            } else {
+              li.textContent = id + ": " + text;
+            }
+            messageList.appendChild(li);
           }
         };
 
@@ -113,24 +141,9 @@
           e.preventDefault();
           const input = document.querySelector(".input");
           const text = input.value;
-          ws.send(JSON.stringify({ id: myId, text }));
+          ws.send(JSON.stringify({ id: myId, text, type: "chat" }));
           input.value = "";
           input.focus();
-        };
-
-        ws.onmessage = function (msg) {
-          if (msg.type !== "chat") return;
-
-          const response = msg.data;
-          const { id, text } = JSON.parse(msg.data);
-          const messageList = document.querySelector(".messages");
-          const li = document.createElement("li");
-          if (id === myId) {
-            li.textContent = `(${id})自分:` + text;
-          } else {
-            li.textContent = id + ": " + text;
-          }
-          messageList.appendChild(li);
         };
 
         ws.onerror = function (error) {
