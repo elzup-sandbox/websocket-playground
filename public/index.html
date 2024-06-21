@@ -55,16 +55,27 @@
           const input = document.querySelector(".input");
           const text = input.value;
 
-          ws.send(myId + ":" + text);
+          const msg = {
+            id: myId,
+            text: text,
+          };
+
+          ws.send(JSON.stringify(msg));
           input.value = "";
           input.focus();
         };
 
         ws.onmessage = function (msg) {
           const response = msg.data;
+          const res = JSON.parse(msg.data);
+
           const messageList = document.querySelector(".messages");
           const li = document.createElement("li");
-          li.textContent = response;
+          if (res.id === myId) {
+            li.textContent = `(${res.id})自分:` + res.text;
+          } else {
+            li.textContent = res.id + ": " + res.text;
+          }
           messageList.appendChild(li);
         };
 
