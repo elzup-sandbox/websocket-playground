@@ -31,3 +31,28 @@ app.ws('/ws', (ws, req) => {
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`)
 })
+
+let players = []
+
+app.ws('/ws2', (ws, req) => {
+  let player = { id: generateId(), ws: ws }
+  players.push(player)
+
+  ws.on('message', (message) => {
+    let data = JSON.parse(message)
+    data.id = player.id
+    players.forEach((p) => {
+      if (p.ws !== ws) {
+        p.ws.send(JSON.stringify(data))
+      }
+    })
+  })
+
+  ws.on('close', () => {
+    players = players.filter((p) => p.ws !== ws)
+  })
+})
+
+function generateId() {
+  return Math.random().toString(36).substr(2, 9)
+}
