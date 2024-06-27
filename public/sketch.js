@@ -33,15 +33,25 @@ function setup() {
 
   socket.onmessage = (event) => {
     let data = JSON.parse(event.data)
-    if (data.id !== player.id) {
-      if (!players[data.id]) {
-        players[data.id] = { x: data.x, y: data.y, bullets: [], hp: data.hp }
-      }
-      if (data.type === 'move') {
-        players[data.id].x = data.x
-        players[data.id].y = data.y
-      } else if (data.type === 'shoot') {
-        players[data.id].bullets.push(data.bullet)
+    if (data.type === 'id') {
+      player.id = data.id
+      return
+    }
+    if (data.id === player.id) return
+
+    if (!players[data.id]) {
+      players[data.id] = { ...data, bullets: [] }
+    }
+    if (data.type === 'move') {
+      players[data.id].x = data.x
+      players[data.id].y = data.y
+    } else if (data.type === 'shoot') {
+      players[data.id].bullets.push(data.bullet)
+    } else if (data.type === 'hit') {
+      if (data.hitId === player.id) {
+        player.hp -= 1
+      } else if (players[data.hitId]) {
+        players[data.hitId].hp -= 1
       }
     }
   }
@@ -95,6 +105,10 @@ function draw() {
     { key: 'up', dx: 0, dy: -5 },
     { key: 'down', dx: 0, dy: 5 },
   ]
+
+  if (player.hp <= 0) {
+    return
+  }
   // Move player
   const control = { left: false, right: false, up: false, down: false }
 
@@ -135,7 +149,7 @@ function keyReleased() {
 }
 
 function mousePressed() {
-  if (player.bullets.length >= 5) return
+  if (player.hp === 0 || player.bullets.length >= 5) return
   let angle = atan2(mouseY - player.y, mouseX - player.x)
   let bullet = {
     x: player.x + 25,
@@ -159,6 +173,7 @@ function checkBulletCollision(bullet) {
   for (let id in players) {
     let otherPlayer = players[id]
     if (
+      otherPlayer.hp > 0 &&
       bullet.x > otherPlayer.x &&
       bullet.x < otherPlayer.x + 50 &&
       bullet.y > otherPlayer.y &&
@@ -166,6 +181,7 @@ function checkBulletCollision(bullet) {
     ) {
       otherPlayer.hp -= 1
       bullet.hit = true
+      store.socket.send(JSON.stringify({ type: 'hit', hitId: id }))
     }
   }
 }

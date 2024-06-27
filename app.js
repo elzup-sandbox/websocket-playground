@@ -37,6 +37,7 @@ let players = []
 app.ws('/ws2', (ws, req) => {
   let player = { id: generateId(), ws: ws }
   players.push(player)
+  req.ws.send(JSON.stringify({ type: 'id', id: player.id }))
 
   ws.on('message', (message) => {
     let data = JSON.parse(message)
