@@ -1,6 +1,6 @@
 let socket
-let player = { id: null, x: 400, y: 500, bullets: [], hp: 10 }
-let players = {}
+const player = { id: null, x: 400, y: 500, bullets: [], hp: 10, moveCounter: 0 }
+const players = {}
 const keys = {}
 
 function setup() {
@@ -99,8 +99,12 @@ function draw() {
     const { x, y } = normalizeXy(moves.dx, moves.dy)
     player.x += x
     player.y += y
+    player.moveCounter = Math.min(player.moveCounter + 1, 100)
     sendPlayerData('move')
+  } else {
+    player.moveCounter = Math.max(player.moveCounter - 1, 0)
   }
+  drawVisibilityLayer()
 }
 function keyPressed() {
   keys[key] = true
@@ -142,4 +146,26 @@ function checkBulletCollision(bullet) {
       bullet.hit = true
     }
   }
+}
+
+function drawVisibilityLayer() {
+  let visibilityRadius = 400 - player.moveCounter * 2
+
+  let layer02 = createGraphics(width, height)
+
+  layer02.fill(0) // Semi-transparent black
+  layer02.rect(0, 0, width, height)
+
+  layer02.erase()
+  layer02.ellipse(
+    player.x + 25,
+    player.y + 25,
+    visibilityRadius * 2,
+    visibilityRadius * 2
+  )
+  for (let bullet of player.bullets) {
+    layer02.ellipse(bullet.x, bullet.y, 50, 50)
+  }
+  layer02.noErase()
+  image(layer02, 0, 0, width, height)
 }
