@@ -1,12 +1,31 @@
-let socket
-const player = { id: null, x: 400, y: 500, bullets: [], hp: 10, moveCounter: 0 }
+const store = {
+  socket: null,
+  maskLayer: null,
+}
+const randRange = (min, max) =>
+  Math.floor(Math.random() * (max - min + 1)) + min
+const player = {
+  id: null,
+  x: randRange(0, 800),
+  y: randRange(0, 800),
+  bullets: [],
+  hp: 10,
+  moveCounter: 0,
+}
 const players = {}
 const keys = {}
 
+const fps = 20
+const playerSpeed = 10
+const bulletSpeed = 15
+
 function setup() {
-  createCanvas(800, 600)
+  createCanvas(800, 800)
+  frameRate(fps)
+  store.maskLayer = createGraphics(width, height)
+
   const host = location.origin.replace(/^http/, 'ws')
-  socket = new WebSocket(host + '/ws2')
+  const socket = new WebSocket(host + '/ws2')
 
   socket.onopen = () => {
     console.log('Connected to the server')
@@ -30,6 +49,7 @@ function setup() {
   socket.onclose = () => {
     console.log('Disconnected from the server')
   }
+  store.socket = socket
 }
 
 function draw() {
@@ -52,6 +72,7 @@ function draw() {
       bullet.y < height &&
       bullet.hit === undefined
   )
+  text(player.hp, player.x + 25, player.y + 60)
 
   // Draw other players
   for (let id in players) {
@@ -92,13 +113,13 @@ function draw() {
 
   const normalizeXy = (x, y) => {
     const l = Math.sqrt(x * x + y * y)
-    return l === 0 ? { x: 0, y: 0 } : { x: (x / l) * 2, y: (y / l) * 2 }
+    return l === 0 ? { x: 0, y: 0 } : { x: x / l, y: y / l }
   }
 
   if (moves.dx !== 0 || moves.dy !== 0) {
     const { x, y } = normalizeXy(moves.dx, moves.dy)
-    player.x += x
-    player.y += y
+    player.x += x * playerSpeed
+    player.y += y * playerSpeed
     player.moveCounter = Math.min(player.moveCounter + 1, 100)
     sendPlayerData('move')
   } else {
@@ -114,12 +135,13 @@ function keyReleased() {
 }
 
 function mousePressed() {
+  if (player.bullets.length >= 5) return
   let angle = atan2(mouseY - player.y, mouseX - player.x)
   let bullet = {
     x: player.x + 25,
     y: player.y + 25,
-    vx: 5 * cos(angle),
-    vy: 5 * sin(angle),
+    vx: bulletSpeed * cos(angle),
+    vy: bulletSpeed * sin(angle),
   }
   player.bullets.push(bullet)
   sendPlayerData('shoot', bullet)
@@ -130,7 +152,7 @@ function sendPlayerData(type, bullet) {
   if (type === 'shoot') {
     data.bullet = bullet
   }
-  socket.send(JSON.stringify(data))
+  store.socket.send(JSON.stringify(data))
 }
 
 function checkBulletCollision(bullet) {
@@ -149,23 +171,24 @@ function checkBulletCollision(bullet) {
 }
 
 function drawVisibilityLayer() {
-  let visibilityRadius = 400 - player.moveCounter * 2
+  let visibilityRadius = 150 - player.moveCounter - player.bullets.length * 10
+  const { maskLayer } = store
 
-  let layer02 = createGraphics(width, height)
+  maskLayer.clear()
 
-  layer02.fill(0) // Semi-transparent black
-  layer02.rect(0, 0, width, height)
+  maskLayer.fill(0) // Semi-transparent black
+  maskLayer.rect(0, 0, width, height)
 
-  layer02.erase()
-  layer02.ellipse(
+  maskLayer.erase()
+  maskLayer.ellipse(
     player.x + 25,
     player.y + 25,
-    visibilityRadius * 2,
-    visibilityRadius * 2
+    visibilityRadius * 5.5,
+    visibilityRadius * 5.5
   )
   for (let bullet of player.bullets) {
-    layer02.ellipse(bullet.x, bullet.y, 50, 50)
+    maskLayer.ellipse(bullet.x, bullet.y, 100, 100)
   }
-  layer02.noErase()
-  image(layer02, 0, 0, width, height)
+  maskLayer.noErase()
+  image(maskLayer, 0, 0, width, height)
 }
