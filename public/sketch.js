@@ -10,10 +10,11 @@ const player = {
   y: randRange(0, 800),
   bullets: [],
   hp: 10,
-  moveCounter: 0,
+  view: 300,
 }
 const players = {}
 const keys = {}
+const viewSpeed = 20
 
 const fps = 20
 const playerSpeed = 10
@@ -134,10 +135,14 @@ function draw() {
     const { x, y } = normalizeXy(moves.dx, moves.dy)
     player.x += x * playerSpeed
     player.y += y * playerSpeed
-    player.moveCounter = Math.min(player.moveCounter + 1, 100)
+    if (player.x < 0) player.x = 0
+    if (player.x > width - 50) player.x = width - 50
+    if (player.y < 0) player.y = 0
+    if (player.y > height - 50) player.y = height - 50
+    player.view = Math.max(player.view - viewSpeed, 400)
     sendPlayerData('move')
   } else {
-    player.moveCounter = Math.max(player.moveCounter - 1, 0)
+    player.view = Math.min(player.view + viewSpeed, 1000)
   }
   drawVisibilityLayer()
 }
@@ -158,6 +163,7 @@ function mousePressed() {
     vy: bulletSpeed * sin(angle),
   }
   player.bullets.push(bullet)
+  player.view = Math.max(player.view - viewSpeed * 10, 200)
   sendPlayerData('shoot', bullet)
 }
 
@@ -187,7 +193,6 @@ function checkBulletCollision(bullet) {
 }
 
 function drawVisibilityLayer() {
-  let visibilityRadius = 150 - player.moveCounter - player.bullets.length * 10
   const { maskLayer } = store
 
   maskLayer.clear()
@@ -196,12 +201,7 @@ function drawVisibilityLayer() {
   maskLayer.rect(0, 0, width, height)
 
   maskLayer.erase()
-  maskLayer.ellipse(
-    player.x + 25,
-    player.y + 25,
-    visibilityRadius * 5.5,
-    visibilityRadius * 5.5
-  )
+  maskLayer.ellipse(player.x + 25, player.y + 25, player.view, player.view)
   for (let bullet of player.bullets) {
     maskLayer.ellipse(bullet.x, bullet.y, 100, 100)
   }
